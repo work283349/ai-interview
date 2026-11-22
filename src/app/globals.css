@@ -1,26 +1,112 @@
 @import "tailwindcss";
 
+/* 設計色票：暖紙色背景 + 墨色文字 + 朱紅點綴 */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --paper: #f4efe6;
+  --paper-2: #ebe4d6;
+  --card: #fbf8f2;
+  --ink: #1c1a17;
+  --muted: #6f685d;
+  --line: #d9d0bf;
+  --accent: #d9481f;
+  --accent-ink: #fff7f1;
+  --accent-soft: #f6dccf;
+  --good: #2f6b4f;
+  --good-soft: #dcebdf;
+  --warn: #a5631a;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --paper: #15130f;
+    --paper-2: #1d1a15;
+    --card: #1f1c17;
+    --ink: #f1ebe0;
+    --muted: #a39b8d;
+    --line: #36302a;
+    --accent: #f0683f;
+    --accent-ink: #1a0c06;
+    --accent-soft: #3a2118;
+    --good: #7fc29f;
+    --good-soft: #1d2e25;
+    --warn: #e0a35a;
   }
 }
 
+@theme inline {
+  --color-paper: var(--paper);
+  --color-paper-2: var(--paper-2);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-good: var(--good);
+  --color-good-soft: var(--good-soft);
+  --color-warn: var(--warn);
+  --font-sans: var(--font-geist-sans), "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-display: var(--font-instrument), var(--font-noto-serif), "Songti TC", serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+/* 細緻的紙張紋理（點陣） */
+.bg-dots {
+  background-image: radial-gradient(color-mix(in oklab, var(--ink) 14%, transparent) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+/* 進場動畫 */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-rise {
+  animation: rise 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@keyframes blink {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+.dot-blink {
+  animation: blink 1.2s infinite both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .animate-rise,
+  .dot-blink {
+    animation: none;
+  }
 }
