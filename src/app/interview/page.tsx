@@ -4,8 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import { API_KEY_HEADER, getApiKey, maskKey, openSettings, useApiKey } from "@/lib/apiKey";
+import { INTERVIEWERS, INTERVIEWER_ORDER, interviewerForQuestion, type InterviewerId } from "@/lib/interviewers";
 
-type ChatMessage = { role: "assistant" | "user"; content: string };
+type ChatMessage = { role: "assistant" | "user"; content: string; interviewer?: InterviewerId };
 
 type Evaluation = {
   score: number;
@@ -14,10 +15,12 @@ type Evaluation = {
   improvements: string[];
   questionFeedback: {
     question: string;
+    interviewer?: InterviewerId;
     answer: string;
     feedback: string;
     betterAnswer: string;
   }[];
+  panelComments?: { interviewer: InterviewerId; comment: string }[];
 };
 
 const QUESTION_OPTIONS = Array.from({ length: 10 }, (_, i) => i + 1);
@@ -27,6 +30,33 @@ function scoreLabel(score: number) {
   if (score >= 70) return "表現良好";
   if (score >= 50) return "仍有進步空間";
   return "需要加強練習";
+}
+
+/* 面試官頭像：白臉為淺色、黑臉為深色 */
+function InterviewerAvatar({ id, className = "size-9 text-sm" }: { id: InterviewerId; className?: string }) {
+  const i = INTERVIEWERS[id];
+  return (
+    <span
+      title={`${i.name}（${i.tag}）`}
+      className={`grid shrink-0 place-items-center rounded-full font-display font-bold ${
+        id === "bad" ? "bg-ink text-paper" : "border border-line bg-card text-ink"
+      } ${className}`}
+    >
+      {i.initial}
+    </span>
+  );
+}
+
+function RoleTag({ id }: { id: InterviewerId }) {
+  return (
+    <span
+      className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+        id === "bad" ? "bg-ink text-paper" : "border border-line bg-card text-ink"
+      }`}
+    >
+      {INTERVIEWERS[id].tag}
+    </span>
+  );
 }
 
 /* 圓環分數 */
@@ -63,12 +93,13 @@ function ScoreRing({ score }: { score: number }) {
 
 export default function InterviewPage() {
   const [jobDescription, setJobDescription] = useState("");
-  const [totalQuestions, setTotalQuestions] = useState(3);
+  const [totalQuestions, setTotalQuestions] = useState(4);
+  const [panel, setPanel] = useState<InterviewerId[]>(["good", "bad"]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [progress, setProgress] = useState({ current: 0, total: 3 });
+  const [progress, setProgress] = useState({ current: 0, total: 4 });
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
   const [errorCode, setErrorCode] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -96,7 +127,7 @@ export default function InterviewPage() {
       const res = await fetch("/api/interview", {
         method: "POST",
         headers: { "Content-Type": "application/json", [API_KEY_HEADER]: key },
-        body: JSON.stringify({ jobDescription, messages: history, totalQuestions }),
+        body: JSON.stringify({ jobDescription, messages: history, totalQuestions, interviewers: panel }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -108,7 +139,7 @@ export default function InterviewPage() {
         setEvaluation(data);
         window.scrollTo({ top: 0, behavior: "smooth" });
       } else {
-        setMessages([...history, { role: "assistant", content: data.question }]);
+        setMessages([...history, { role: "assistant", content: data.question, interviewer: data.interviewer }]);
         setProgress({ current: data.questionNumber, total: data.totalQuestions });
       }
     } catch (e) {
@@ -116,6 +147,14 @@ export default function InterviewPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  // 切換面試官（至少要保留一位），並維持白臉先、黑臉後的順序
+  function togglePanel(id: InterviewerId) {
+    setPanel((prev) => {
+      if (prev.includes(id)) return prev.length > 1 ? prev.filter((x) => x !== id) : prev;
+      return INTERVIEWER_ORDER.filter((x) => x === id || prev.includes(x));
+    });
   }
 
   function handleStart() {
@@ -140,6 +179,11 @@ export default function InterviewPage() {
     setProgress({ current: 0, total: totalQuestions });
   }
 
+  const answeredCount = messages.filter((m) => m.role === "user").length;
+  // 載入中時，下一位發言的面試官
+  const nextSpeaker = interviewerForQuestion(panel, answeredCount + 1);
+  const isGeneratingReport = answeredCount >= totalQuestions;
+
   const progressPct = evaluation ? 100 : (Math.max(progress.current - 1, 0) / progress.total) * 100;
 
   return (
@@ -153,7 +197,7 @@ export default function InterviewPage() {
             <section className="animate-rise">
               <p className="mb-3 font-mono text-xs tracking-widest text-accent uppercase">Step 1 · Setup</p>
               <h1 className="font-display text-4xl font-bold sm:text-5xl">準備你的面試</h1>
-              <p className="mt-3 text-muted">貼上職缺描述並選擇題數，AI 面試官會依此為你量身出題。</p>
+              <p className="mt-3 text-muted">選擇面試官、貼上職缺描述並選擇題數，AI 面試官會依此為你量身出題。</p>
 
               <div className="mt-10 rounded-3xl border border-line bg-card p-6 shadow-[0_30px_60px_-40px_rgba(0,0,0,0.4)] sm:p-8">
                 <div
@@ -175,6 +219,47 @@ export default function InterviewPage() {
                   <button onClick={openSettings} className="shrink-0 text-xs font-medium underline underline-offset-4">
                     {apiKey ? "變更" : "前往設定"}
                   </button>
+                </div>
+
+                <p className="mb-3 flex items-center justify-between text-sm font-medium">
+                  面試官
+                  <span className="text-xs font-normal text-muted">
+                    {panel.length > 1 ? "小組面試・兩位輪流提問" : "一對一面試"}
+                  </span>
+                </p>
+                <div className="mb-8 grid gap-3 sm:grid-cols-2">
+                  {INTERVIEWER_ORDER.map((id) => {
+                    const i = INTERVIEWERS[id];
+                    const on = panel.includes(id);
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => togglePanel(id)}
+                        aria-pressed={on}
+                        className={`relative flex gap-4 rounded-2xl border p-4 text-left transition-all ${
+                          on ? "border-ink bg-paper shadow-[0_12px_30px_-20px_rgba(0,0,0,0.5)]" : "border-line bg-paper/40 opacity-60 hover:opacity-100"
+                        }`}
+                      >
+                        <InterviewerAvatar id={id} className="size-12 text-lg" />
+                        <span className="flex-1">
+                          <span className="flex items-center gap-2">
+                            <span className="font-semibold">{i.name}</span>
+                            <RoleTag id={id} />
+                          </span>
+                          <span className="mt-0.5 block text-xs text-muted">{i.title}</span>
+                          <span className="mt-2 block text-xs leading-relaxed text-muted">{i.description}</span>
+                        </span>
+                        <span
+                          className={`absolute top-3 right-3 grid size-5 place-items-center rounded-full border text-[10px] ${
+                            on ? "border-accent bg-accent text-accent-ink" : "border-line"
+                          }`}
+                        >
+                          {on && "✓"}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
 
                 <label className="mb-2 flex items-center justify-between text-sm font-medium">
@@ -241,36 +326,50 @@ export default function InterviewPage() {
                     key={i}
                     className={`animate-rise flex gap-3 ${m.role === "user" ? "flex-row-reverse" : ""}`}
                   >
-                    <span
-                      className={`grid size-9 shrink-0 place-items-center rounded-full text-xs font-medium ${
-                        m.role === "assistant" ? "bg-ink text-paper" : "border border-line bg-card"
-                      }`}
-                    >
-                      {m.role === "assistant" ? <span className="font-display text-base italic">R</span> : "你"}
-                    </span>
-                    <div
-                      className={`max-w-[80%] rounded-2xl px-5 py-4 leading-relaxed whitespace-pre-wrap ${
-                        m.role === "assistant"
-                          ? "rounded-tl-sm border border-line bg-card"
-                          : "rounded-tr-sm bg-ink text-paper"
-                      }`}
-                    >
-                      {m.content}
+                    {m.role === "assistant" ? (
+                      <InterviewerAvatar id={m.interviewer ?? panel[0]} />
+                    ) : (
+                      <span className="grid size-9 shrink-0 place-items-center rounded-full bg-accent-soft text-xs font-medium text-accent">
+                        你
+                      </span>
+                    )}
+                    <div className={`flex max-w-[80%] flex-col gap-1.5 ${m.role === "user" ? "items-end" : ""}`}>
+                      {m.role === "assistant" && (
+                        <span className="flex items-center gap-2 text-xs text-muted">
+                          {INTERVIEWERS[m.interviewer ?? panel[0]].name}
+                          <RoleTag id={m.interviewer ?? panel[0]} />
+                        </span>
+                      )}
+                      <div
+                        className={`rounded-2xl px-5 py-4 leading-relaxed whitespace-pre-wrap ${
+                          m.role === "assistant"
+                            ? (m.interviewer ?? panel[0]) === "bad"
+                              ? "rounded-tl-sm border border-ink/70 bg-card"
+                              : "rounded-tl-sm border border-line bg-card"
+                            : "rounded-tr-sm bg-ink text-paper"
+                        }`}
+                      >
+                        {m.content}
+                      </div>
                     </div>
                   </div>
                 ))}
 
                 {loading && (
                   <div className="flex items-center gap-3">
-                    <span className="grid size-9 place-items-center rounded-full bg-ink text-paper">
-                      <span className="font-display text-base italic">R</span>
-                    </span>
+                    {isGeneratingReport ? (
+                      <span className="grid size-9 place-items-center rounded-full bg-ink text-paper">
+                        <span className="font-display text-base italic">R</span>
+                      </span>
+                    ) : (
+                      <InterviewerAvatar id={nextSpeaker} />
+                    )}
                     <div className="flex items-center gap-1.5 rounded-2xl rounded-tl-sm border border-line bg-card px-5 py-4">
                       <span className="dot-blink size-1.5 rounded-full bg-muted" />
                       <span className="dot-blink size-1.5 rounded-full bg-muted [animation-delay:0.15s]" />
                       <span className="dot-blink size-1.5 rounded-full bg-muted [animation-delay:0.3s]" />
                       <span className="ml-2 text-sm text-muted">
-                        {messages.filter((m) => m.role === "user").length >= totalQuestions ? "正在產生評估報告" : "面試官思考中"}
+                        {isGeneratingReport ? "面試官們正在討論評估報告" : `${INTERVIEWERS[nextSpeaker].name}思考中`}
                       </span>
                     </div>
                   </div>
@@ -325,6 +424,33 @@ export default function InterviewPage() {
                 </div>
               </div>
 
+              {evaluation.panelComments && evaluation.panelComments.length > 0 && (
+                <div className={`grid gap-4 ${evaluation.panelComments.length > 1 ? "sm:grid-cols-2" : ""}`}>
+                  {evaluation.panelComments.map((c) => (
+                    <figure
+                      key={c.interviewer}
+                      className={`flex flex-col gap-4 rounded-3xl p-6 ${
+                        c.interviewer === "bad" ? "bg-ink text-paper" : "border border-line bg-card"
+                      }`}
+                    >
+                      <blockquote className="font-display text-lg leading-relaxed">「{c.comment}」</blockquote>
+                      <figcaption className="mt-auto flex items-center gap-3 text-sm">
+                        <InterviewerAvatar
+                          id={c.interviewer}
+                          className={`size-8 text-sm ${c.interviewer === "bad" ? "ring-1 ring-paper/30" : ""}`}
+                        />
+                        <span>
+                          {INTERVIEWERS[c.interviewer].name}
+                          <span className="ml-2 text-xs opacity-60">
+                            {INTERVIEWERS[c.interviewer].tag} · {INTERVIEWERS[c.interviewer].title}
+                          </span>
+                        </span>
+                      </figcaption>
+                    </figure>
+                  ))}
+                </div>
+              )}
+
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="rounded-3xl border border-line bg-card p-6">
                   <h3 className="mb-4 flex items-center gap-2 font-semibold text-good">
@@ -359,7 +485,15 @@ export default function InterviewPage() {
                         <span className="font-display text-3xl leading-none text-accent italic">
                           {String(i + 1).padStart(2, "0")}
                         </span>
-                        <p className="flex-1 leading-relaxed whitespace-pre-wrap">{q.question}</p>
+                        <div className="flex-1">
+                          {q.interviewer && (
+                            <span className="mb-2 flex items-center gap-2 text-xs text-muted">
+                              {INTERVIEWERS[q.interviewer].name} 提問
+                              <RoleTag id={q.interviewer} />
+                            </span>
+                          )}
+                          <p className="leading-relaxed whitespace-pre-wrap">{q.question}</p>
+                        </div>
                         <span className="grid size-7 shrink-0 place-items-center rounded-full border border-line text-sm transition-transform group-open:rotate-45">+</span>
                       </summary>
                       <div className="flex flex-col gap-4 px-6 pb-6">

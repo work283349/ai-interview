@@ -10,8 +10,8 @@ const features = [
   },
   {
     no: "02",
-    title: "像真人一樣追問",
-    body: "每回答一題，面試官會先給一句回饋，再針對你的內容深入追問，逼出你真正的實力。",
+    title: "黑臉 × 白臉面試官",
+    body: "白臉溫和引導、黑臉犀利質疑。可以一對一，也能組成面試小組輪流提問、針對你的回答追問。",
   },
   {
     no: "03",
@@ -86,7 +86,7 @@ function HeroMock() {
         </div>
         <div className="flex flex-col gap-3 text-sm leading-relaxed">
           <div className="max-w-[88%] rounded-2xl rounded-tl-sm bg-paper-2 px-4 py-3">
-            <span className="mb-1 block font-mono text-[10px] tracking-widest text-muted uppercase">Interviewer</span>
+            <span className="mb-1 block text-[11px] text-muted">陳嚴 · 黑臉</span>
             很好的例子。你提到重構了狀態管理，可以具體說明當時如何評估 Redux 與 Context 的取捨嗎？
           </div>
           <div className="max-w-[80%] self-end rounded-2xl rounded-tr-sm bg-ink px-4 py-3 text-paper">
