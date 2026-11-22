@@ -24,14 +24,17 @@ const MAX_QUESTIONS = 10;
 // 從環境變數讀取要使用的 OpenAI 模型，沒設定就用預設值
 const MODEL = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
 
+// 前端帶上使用者 API 金鑰時使用的標頭名稱（需與 src/lib/apiKey.ts 一致）
+const API_KEY_HEADER = "x-openai-api-key";
+
 // 處理 POST /api/interview 請求的函式
 export async function POST(request: Request) {
-  // 從環境變數（.env.local）讀取 OpenAI 的 API 金鑰
-  const apiKey = process.env.OPENAI_API_KEY;
-  // 如果沒有設定金鑰
+  // BYOK：從請求標頭讀取使用者自己的 OpenAI API 金鑰（不使用伺服器環境變數），並去掉前後空白
+  const apiKey = request.headers.get(API_KEY_HEADER)?.trim() ?? "";
+  // 如果使用者沒有帶上金鑰
   if (!apiKey) {
-    // 回傳 500 錯誤，提醒伺服器設定有問題
-    return Response.json({ error: "伺服器尚未設定 OPENAI_API_KEY" }, { status: 500 });
+    // 回傳 401 錯誤，提醒使用者先到設定輸入 API Key
+    return Response.json({ error: "請先在設定中輸入你的 OpenAI API Key", code: "missing_api_key" }, { status: 401 });
   } // 金鑰檢查結束
 
   // 宣告變數用來存放解析後的請求內容
@@ -138,9 +141,19 @@ ${answeredCount === 0 ? "請先簡短打招呼，然後提出第一個問題。"
     if (!openaiRes.ok) {
       // 讀取錯誤訊息文字
       const errText = await openaiRes.text();
-      // 在伺服器端印出錯誤，方便除錯
+      // 在伺服器端印出錯誤，方便除錯（不印出金鑰）
       console.error("OpenAI API 錯誤：", errText);
-      // 回傳 502 錯誤給前端
+      // 如果 OpenAI 回應 401，代表使用者的金鑰無效或已被撤銷
+      if (openaiRes.status === 401) {
+        // 回傳 401 錯誤，請使用者檢查金鑰
+        return Response.json({ error: "API Key 無效，請到設定確認後重新輸入", code: "invalid_api_key" }, { status: 401 });
+      } // 金鑰無效判斷結束
+      // 如果 OpenAI 回應 429，代表額度用完或請求過於頻繁
+      if (openaiRes.status === 429) {
+        // 回傳 429 錯誤，請使用者檢查 OpenAI 帳戶額度
+        return Response.json({ error: "OpenAI 額度不足或請求過於頻繁，請確認你的帳戶餘額", code: "rate_limited" }, { status: 429 });
+      } // 額度判斷結束
+      // 其他錯誤一律回傳 502 錯誤給前端
       return Response.json({ error: "AI 服務暫時無法使用" }, { status: 502 });
     } // 狀態碼檢查結束
 

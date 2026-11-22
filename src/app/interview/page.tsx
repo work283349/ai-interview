@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
+import { API_KEY_HEADER, getApiKey, maskKey, openSettings, useApiKey } from "@/lib/apiKey";
 
 type ChatMessage = { role: "assistant" | "user"; content: string };
 
@@ -69,7 +70,9 @@ export default function InterviewPage() {
   const [error, setError] = useState("");
   const [progress, setProgress] = useState({ current: 0, total: 3 });
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
+  const [errorCode, setErrorCode] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
+  const apiKey = useApiKey();
 
   const started = messages.length > 0;
 
@@ -79,16 +82,27 @@ export default function InterviewPage() {
   }, [messages, loading, started]);
 
   async function callInterview(history: ChatMessage[]) {
+    const key = getApiKey();
+    if (!key) {
+      setError("請先在設定中輸入你的 OpenAI API Key");
+      setErrorCode("missing_api_key");
+      openSettings();
+      return;
+    }
     setLoading(true);
     setError("");
+    setErrorCode("");
     try {
       const res = await fetch("/api/interview", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", [API_KEY_HEADER]: key },
         body: JSON.stringify({ jobDescription, messages: history, totalQuestions }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "發生錯誤");
+      if (!res.ok) {
+        setErrorCode(data.code ?? "");
+        throw new Error(data.error ?? "發生錯誤");
+      }
 
       if (data.type === "evaluation") {
         setEvaluation(data);
@@ -122,6 +136,7 @@ export default function InterviewPage() {
     setAnswer("");
     setEvaluation(null);
     setError("");
+    setErrorCode("");
     setProgress({ current: 0, total: totalQuestions });
   }
 
@@ -141,6 +156,27 @@ export default function InterviewPage() {
               <p className="mt-3 text-muted">貼上職缺描述並選擇題數，AI 面試官會依此為你量身出題。</p>
 
               <div className="mt-10 rounded-3xl border border-line bg-card p-6 shadow-[0_30px_60px_-40px_rgba(0,0,0,0.4)] sm:p-8">
+                <div
+                  className={`mb-8 flex items-center justify-between gap-3 rounded-2xl px-4 py-3 text-sm ${
+                    apiKey ? "bg-paper-2" : "border border-accent/40 bg-accent-soft"
+                  }`}
+                >
+                  {apiKey ? (
+                    <span className="flex items-center gap-2">
+                      <span className="size-2 rounded-full bg-good" />
+                      OpenAI API Key <code className="font-mono text-xs text-muted">{maskKey(apiKey)}</code>
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2 text-accent">
+                      <span className="size-2 rounded-full bg-accent" />
+                      開始前，請先設定你的 OpenAI API Key
+                    </span>
+                  )}
+                  <button onClick={openSettings} className="shrink-0 text-xs font-medium underline underline-offset-4">
+                    {apiKey ? "變更" : "前往設定"}
+                  </button>
+                </div>
+
                 <label className="mb-2 flex items-center justify-between text-sm font-medium">
                   職缺描述
                   <span className="font-mono text-xs font-normal text-muted">{jobDescription.length} 字</span>
@@ -175,9 +211,9 @@ export default function InterviewPage() {
                 <button
                   className="group mt-8 flex w-full items-center justify-center gap-3 rounded-full bg-accent px-6 py-4 font-medium text-accent-ink transition-all hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-40"
                   onClick={handleStart}
-                  disabled={loading || !jobDescription.trim()}
+                  disabled={loading || !jobDescription.trim() || !apiKey}
                 >
-                  {loading ? "面試官準備中⋯⋯" : "進入面試室"}
+                  {loading ? "面試官準備中⋯⋯" : !apiKey ? "請先設定 API Key" : "進入面試室"}
                   {!loading && <span className="transition-transform group-hover:translate-x-1">→</span>}
                 </button>
               </div>
@@ -361,7 +397,12 @@ export default function InterviewPage() {
           {error && (
             <div className="mt-6 flex items-center justify-between gap-4 rounded-2xl border border-accent/40 bg-accent-soft px-5 py-4 text-sm text-accent">
               <span>{error}</span>
-              {started && !evaluation && !loading && (
+              {(errorCode === "missing_api_key" || errorCode === "invalid_api_key") && (
+                <button className="shrink-0 underline underline-offset-4" onClick={openSettings}>
+                  開啟設定
+                </button>
+              )}
+              {started && !evaluation && !loading && errorCode !== "missing_api_key" && errorCode !== "invalid_api_key" && (
                 <button className="shrink-0 underline underline-offset-4" onClick={() => callInterview(messages)}>
                   重試
                 </button>

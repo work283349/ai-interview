@@ -26,16 +26,20 @@ const features = [
 ];
 
 const steps = [
+  { title: "設定 Key", body: "在設定輸入你的 OpenAI API Key，只存在你的瀏覽器。" },
   { title: "貼上職缺", body: "複製你想應徵的職缺描述，貼進面試室。" },
-  { title: "選擇題數", body: "1 到 10 題，五分鐘快練或完整模擬都可以。" },
-  { title: "逐題作答", body: "像真正的面試一樣，一題一題回答面試官。" },
+  { title: "逐題作答", body: "選擇 1–10 題，像真正的面試一樣一題一題回答。" },
   { title: "拿到報告", body: "取得評分、優點、改進建議與逐題示範。" },
 ];
 
 const faqs = [
   {
     q: "需要註冊帳號嗎？",
-    a: "不需要。點擊「開始模擬面試」就能直接進入面試室，貼上職缺即可開始。",
+    a: "不需要。只要準備好你自己的 OpenAI API Key，在右上角的設定輸入後，就能直接開始面試。",
+  },
+  {
+    q: "為什麼要用自己的 API Key？安全嗎？",
+    a: "Rehearse 採用 BYOK（Bring Your Own Key）模式，費用直接由你的 OpenAI 帳戶計算。Key 只存在你的瀏覽器 localStorage，面試時隨請求傳給伺服器轉送 OpenAI，伺服器不會保存。",
   },
   {
     q: "支援哪些職缺類型？",
@@ -141,7 +145,7 @@ export default function Landing() {
                   看看怎麼運作
                 </a>
               </div>
-              <p className="mt-6 font-mono text-xs text-muted">免註冊 · 1–10 題自由選 · 繁體中文</p>
+              <p className="mt-6 font-mono text-xs text-muted">免註冊 · 使用你自己的 OpenAI Key · 繁體中文</p>
             </div>
 
             <div className="animate-rise px-4 [animation-delay:0.15s] sm:px-10 lg:px-0">

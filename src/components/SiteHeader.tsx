@@ -1,4 +1,5 @@
 import Link from "next/link";
+import SettingsButton from "./SettingsButton";
 
 export function Logo() {
   return (
@@ -34,19 +35,22 @@ export default function SiteHeader({ variant = "landing" }: { variant?: "landing
           </span>
         )}
 
-        {variant === "landing" ? (
-          <Link
-            href="/interview"
-            className="group inline-flex items-center gap-2 rounded-full bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-accent hover:text-accent-ink"
-          >
-            開始模擬面試
-            <span className="transition-transform group-hover:translate-x-0.5">→</span>
-          </Link>
-        ) : (
-          <Link href="/" className="text-sm text-muted transition-colors hover:text-ink">
-            ← 回到首頁
-          </Link>
-        )}
+        <div className="flex items-center gap-3">
+          <SettingsButton />
+          {variant === "landing" ? (
+            <Link
+              href="/interview"
+              className="group inline-flex items-center gap-2 rounded-full bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-accent hover:text-accent-ink"
+            >
+              開始模擬面試
+              <span className="transition-transform group-hover:translate-x-0.5">→</span>
+            </Link>
+          ) : (
+            <Link href="/" className="text-sm text-muted transition-colors hover:text-ink">
+              ← 回到首頁
+            </Link>
+          )}
+        </div>
       </div>
     </header>
   );
